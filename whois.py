@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import getpass
 import sys
 import telnetlib
 
@@ -9,11 +8,11 @@ port = '43'
 timeout = 5
 
 for host in whoisServers:
-    print("Connecting to {}".format(host))
-    telnet = telnetlib.Telnet(host, port, timeout)
-    telnet.write("com" + "\n")
+    print("Connecting to {}".format( (host,) ))
+    tn = telnetlib.Telnet(host, port, timeout)
+    tn.write("com" + "\n")
     print("-----------------------------")
-    contents = telnet.read_all()
+    contents = tn.read_all()
     print(contents)
     print("-----------------------------")
     print("Disconnected from {}".format(host))
