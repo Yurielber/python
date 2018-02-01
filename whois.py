@@ -123,15 +123,13 @@ def find_best_response(response_list):
             index += 1
 
 def weight(response):
-    valid_line_matcher = r'^\s*(?P<key>\w+):\s+(?P<value>.*)$'
+    valid_line_matcher = r'^\s*(?P<key>[^:]+):\s+(?P<value>.*)$'
     total = 0
     for line in response:
         if (re.match(valid_line_matcher, line, re.I)):
+            #m = re.search(valid_line_matcher, line, re.I)
+            #print('\t%50s --> %s' % (m.group('key'), m.group('value') ) )
             total += 1
-    print('=' * 30)
-    print(response)
-    print('Weight: %s' % (total) )
-    print('=' * 30)
     return total
 
 def query(domain):
