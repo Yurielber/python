@@ -8,7 +8,7 @@ port = '43'
 timeout = 5
 
 for host in whoisServers:
-    print('Connecting to {}'.format(host))
+    print('Connecting to %s' % (host))
     tn = telnetlib.Telnet(host, port, timeout)
     tn.write("com" + "\n")
 
