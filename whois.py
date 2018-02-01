@@ -4,15 +4,13 @@ import sys
 import telnetlib
 import re
 
-rootWhoisServer = 'whois.iana.org'
+root_whois_server = 'whois.iana.org'
 port = '43'
 
 def printLine():
     print('-' * 80)
 
-def lookup_once(domain, host=None, port='43', timeout=5):
-    if host is None:
-        host = rootWhoisServer
+def lookup_once(domain, host, port='43', timeout=5):
     printLine()
     print('Connecting to %s' % (host) )
     printLine()
@@ -30,18 +28,31 @@ def lookup_once(domain, host=None, port='43', timeout=5):
     return contents
 
 def lookup(domain):
-    feedback = lookup_once(domain)
+    feedback = ''
+    whois_server = None
 
-    refer_matcher = r'^\s*refer:\s*(?P<whoisServer>whois[.].*)$'
-    next_whois_server = None
-    for line in feedback:
-        if (re.match(refer_matcher, line, re.I)):
-            m = re.search(refer_matcher, line, re.I)
-            next_whois_server = m.group('whoisServer')
+    refer_whois_server_matcher = r'^\s*refer:\s+(?P<whoisServer>whois[.].*)$'
+    registrar_whois_server_matcher = r'^\s*Registrar WHOIS Server:\s+(?P<whoisServer>whois[.].*)$'
+
+    matcher_list = [refer_whois_server_matcher, registrar_whois_server_matcher]
+
+    # lookup
+    whois_server = root_whois_server
+    while(True):
+        feedback = lookup_once(domain, host=whois_server)
+        next_whois_server = None
+        for line in feedback.splitlines():
+            for matcher in matcher_list:
+                if (re.match(matcher, line, re.I)):
+                    m = re.search(matcher, line, re.I)
+                    next_whois_server = m.group('whoisServer')
+                    break
+            if next_whois_server is not None:
+                break
+        if next_whois_server is not None and str(next_whois_server).strip().lower() != whois_server.lower():
+            whois_server = next_whois_server
+        else:
             break
-    # do another lookup
-    if next_whois_server is not None:
-        lookup_once(domain, host=next_whois_server)
 
 if __name__ == '__main__':
     input_params_num = len(sys.argv)
