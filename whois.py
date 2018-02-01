@@ -37,7 +37,7 @@ def lookup_by_iana(domain, port='43', timeout=5):
     contents = lookup(domain, host)
     lines = contents.splitlines()
 
-    iana_query_result_matcher = r'^%\s+This query returned (?P<matchedRecordNum>\d*?) objects.$'
+    iana_query_result_matcher = r'^%\s+This query returned (?P<matchedRecordNum>\d*?) object.*$'
     iana_refer_whois_server_matcher = r'^\s*refer:\s+(?P<referWhoisServer>whois[.].*)$'
 
     # test if query result valid
@@ -45,6 +45,7 @@ def lookup_by_iana(domain, port='43', timeout=5):
         if (re.match(iana_query_result_matcher, line, re.I)):
             m = re.search(iana_query_result_matcher, line, re.I)
             record_matched = m.group('matchedRecordNum')
+            print('-' * 20 + str(record_matched) )
             # check return value
             if record_matched is None:
                 raise RuntimeError('IANA not return')
