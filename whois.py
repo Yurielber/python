@@ -57,8 +57,8 @@ def lookup_by_iana(domain, port='43', timeout=5):
 
     # test if refer whois server exist
     for line in lines:
-        if (re.match(iana_refer_whois_server_matcher)):
-            m = re.search(iana_refer_whois_server_matcher)
+        if (re.match(iana_refer_whois_server_matcher, line, re.I)):
+            m = re.search(iana_refer_whois_server_matcher, line, re.I)
             refer_server = m.group('referWhoisServer')
             # validate refer whois server None or empty
             if refer_server is None or not refer_server:
@@ -125,7 +125,7 @@ def query(domain):
                 success, registrar_server, lines = lookup_by_registrar(domain, host=whois_server)
                 lookup_count += 1
                 if not success:
-                    break;
+                    break
                 # success
                 received_response.append(lines)
                 if registrar_server is not None and whois_server.lower() != str(registrar_server).strip().lower():
@@ -141,4 +141,4 @@ if __name__ == '__main__':
     if (input_params_num <= 1):
         raise RuntimeError('Invalid domain')
     target = str(sys.argv[1])
-    lookup(target)
+    query(target)
