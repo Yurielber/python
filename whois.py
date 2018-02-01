@@ -107,6 +107,33 @@ def lookup_by_registrar(domain, host, port='43', timeout=5):
             break
     return success, registrar_server, lines
 
+def find_best_response(response_list):
+    if response_list is None or len(response_list) <= 0:
+        return
+    response_weight = []
+    for response in response_list:
+        response_weight.append(weight(response))
+    max_weight = max(response_weight)
+    # find max response
+    index = 0
+    for item in response_weight:
+        if item == max_weight:
+            return response_list
+        else:
+            index += 1
+
+def weight(response):
+    valid_line_matcher = r'^\s*(?P<key>\w+):\s+(?P<value>.*)$'
+    total = 0
+    for line in response:
+        if (re.match(valid_line_matcher, line, re.I)):
+            total += 1
+    print('=' * 30)
+    print(response)
+    print('Weight: %s' % (total) )
+    print('=' * 30)
+    return total
+
 def query(domain):
     received_response = []
     success, refer_server, lines = lookup_by_iana(domain)
@@ -134,8 +161,8 @@ def query(domain):
                     whois_server = registrar_server
                 else:
                     break
-    for response in received_response:
-        print(response)
+    print('+' * 80)
+    print(find_best_response(received_response))
 
 if __name__ == '__main__':
     input_params_num = len(sys.argv)
