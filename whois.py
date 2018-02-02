@@ -11,23 +11,26 @@ def print_line():
     print('-' * 80)
 
 
-def lookup(domain, host, port='43', timeout=5):
+def lookup(domain, host, port='43', timeout=5, verbose=False):
     contents = []
 
     try:
-        print_line()
-        print 'Connecting to %s' % host
-        print_line()
+        if verbose:
+            print_line()
+            print 'Connecting to %s' % host
+            print_line()
 
         tn = telnetlib.Telnet(host, port, timeout)
         tn.write( domain + "\n")
         contents = tn.read_all()
 
-        print(contents)
+        if verbose:
+            print(contents)
 
-        print_line()
-        print 'Disconnected from %s' % host
-        print_line()
+        if verbose:
+            print_line()
+            print 'Disconnected from %s' % host
+            print_line()
     except:
         pass
 
@@ -161,7 +164,7 @@ def query(domain):
             if registrar_whois_server is not None and whois_server.lower() != str(registrar_whois_server).strip().lower():
                 # prepare to do another query
                 whois_server = registrar_whois_server
-            else:
+            else:  # no query need, quit
                 break
     lines = find_response_with_best_priority(candidate_response)
     if lines is not None and isinstance(lines, list):  # empty list []
