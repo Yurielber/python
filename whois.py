@@ -123,13 +123,17 @@ def find_response_with_best_priority(response_list):
 
 def priority(response):
     valid_line_pattern = r'^\s*(?P<key>[^:]+):\s+(?P<value>.*)$'  # the key: value format
-    total_line_count = 0
+    comment_line_begin_pattern = r'^>>> .* <<<$'
+    body_line_count = 0
     for line in response:
         m = re.search(valid_line_pattern, line)
         if m:
-            total_line_count += 1
+            body_line_count += 1
             #print('\t%50s --> %s' % (m.group('key'), m.group('value') ) )
-    return total_line_count
+        comment = re.search(comment_line_begin_pattern, line)
+        if comment:
+            break  # here comment block begin, skip calculate
+    return body_line_count
 
 
 def query(domain):
@@ -149,18 +153,18 @@ def query(domain):
         lookup_count = 0
         while lookup_count < max_number_of_lookup:
             # query
-            success, registrar_server, lines = lookup_by_registrar(domain, host=whois_server)
+            success, registrar_whois_server, lines = lookup_by_registrar(domain, host=whois_server)
             lookup_count += 1
             if not success:
                 break  # break if query fail
             candidate_response.append(lines)
-            if registrar_server is not None and whois_server.lower() != str(registrar_server).strip().lower():
+            if registrar_whois_server is not None and whois_server.lower() != str(registrar_whois_server).strip().lower():
                 # prepare to do another query
-                whois_server = registrar_server
+                whois_server = registrar_whois_server
             else:
                 break
     lines = find_response_with_best_priority(candidate_response)
-    if lines is not None and isinstance(list, lines):  # empty list []
+    if lines is not None and isinstance(lines, list):  # empty list []
         print('+' * 80)
         for line in lines:
             print(line)
