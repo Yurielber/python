@@ -5,15 +5,16 @@ import telnetlib
 import re
 
 iana_whois_server = 'whois.iana.org'
-port = '43'
 
-def printLine():
+
+def print_line():
     print('-' * 80)
 
+
 def lookup(domain, host, port='43', timeout=5):
-    printLine()
-    print('Connecting to %s' % (host) )
-    printLine()
+    print_line()
+    print('Connecting to %s' % host, )
+    print_line()
 
     tn = telnetlib.Telnet(host, port, timeout)
     tn.write( domain + "\n")
@@ -21,11 +22,12 @@ def lookup(domain, host, port='43', timeout=5):
 
     print(contents)
 
-    printLine()
-    print('Disconnected from %s' % (host))
-    printLine()
+    print_line()
+    print('Disconnected from %s' % host, )
+    print_line()
 
     return contents
+
 
 def lookup_by_iana(domain, port='43', timeout=5):
     success = False
@@ -34,137 +36,130 @@ def lookup_by_iana(domain, port='43', timeout=5):
 
     host = iana_whois_server
 
-    contents = lookup(domain, host)
-    lines = contents.splitlines()
-
-    iana_query_result_matcher = r'^%\s+This query returned (?P<matchedRecordNum>\d*?) object.*$'
-    iana_refer_whois_server_matcher = r'^\s*refer:\s+(?P<referWhoisServer>whois[.].*)$'
+    lines = lookup(domain, host).splitlines()
 
     # test if query result valid
+    iana_query_result_pattern = r'^%\s+This query returned (?P<matchedRecordNum>\d+?) object.*$'
+
     for line in lines:
-        if (re.match(iana_query_result_matcher, line, re.I)):
-            m = re.search(iana_query_result_matcher, line, re.I)
+        m = re.search(iana_query_result_pattern, line, re.I)
+        if m:  # not None when regex matched
             record_matched = m.group('matchedRecordNum')
-            print('-' * 20 + str(record_matched) )
+            # print('-' * 20 + str(record_matched) )
             # check return value
             if record_matched is None:
                 raise RuntimeError('IANA not return')
             # whether success or fail
             try:
                 success = True if int(record_matched) > 0 else False
+                break
             except ValueError:
                 print('value not an integer')
-            break
 
     # test if refer whois server exist
+    iana_refer_whois_server_pattern = r'^\s*refer:\s+(?P<referWhoisServer>whois[.].+)$'
+
     for line in lines:
-        if (re.match(iana_refer_whois_server_matcher, line, re.I)):
-            m = re.search(iana_refer_whois_server_matcher, line, re.I)
-            refer_server = m.group('referWhoisServer')
-            # validate refer whois server None or empty
-            if refer_server is None or not refer_server:
-                raise RuntimeError('got invalid refer server')
-            break
+        m = re.search(iana_refer_whois_server_pattern, line, re.I)
+        if m:
+            refer_server = m.group('referWhoisServer')  # if regex match, the server must non-empty
 
     # remove comment lines
-    comment_line_matcher = r'^% .*$'
-    new_lines = [line for line in lines if not re.match(comment_line_matcher, line, re.I)]
-    lines = new_lines
-    return success, refer_server, lines
+    comment_line_pattern = r'^% .*$'  # comment line start with %
+    cleanup_lines = [line for line in lines if not re.match(comment_line_pattern, line)]
+
+    return success, refer_server, cleanup_lines
+
 
 def lookup_by_registrar(domain, host, port='43', timeout=5):
     success = False
-    registrar_server = None
+    registrar_whois_server = None
     lines = []
 
-    contents = lookup(domain, host)
-
-    lines = contents.splitlines()
-
-    registrar_success_matcher = r'^\s*Domain Name:\s+(?P<domainName>.*)$'
-    registrar_whois_server_matcher = r'^\s*Registrar WHOIS Server:\s+(?P<whoisServer>whois[.].*)$'
+    lines = lookup(domain, host).splitlines()
 
     # test if target domain found
+    registrar_success_pattern = r'^\s*Domain Name:\s+(?P<domainName>.+)$'
+
     for line in lines:
-        if (re.match(registrar_success_matcher, line, re.I)):
-            m = re.search(registrar_success_matcher, line, re.I)
+        m = re.search(registrar_success_pattern, line, re.I)
+        if m:
             target_domain = m.group('domainName')
-            # check return value
-            if target_domain is None or not target_domain:
-                raise RuntimeError('can\'t found target domain name')
             # test if domain match
-            success = True if target_domain.lower() == str(domain).lower() else False
+            success = True if target_domain.lower().strip() == str(domain).lower() else False
             break
 
     # test if additional whois server found
+    registrar_whois_server_pattern = r'^\s*Registrar WHOIS Server:\s+(?P<whoisServer>whois[.].+)$'
+
     for line in lines:
-        if (re.match(registrar_whois_server_matcher, line, re.I)):
-            m = re.search(registrar_whois_server_matcher, line, re.I)
-            registrar_server = m.group('whoisServer')
-            # validate refer whois server None or empty
-            if registrar_server is None or not registrar_server:
-                raise RuntimeError('invalid whois server')
+        m = re.search(registrar_whois_server_pattern, line, re.I)
+        if m:
+            registrar_whois_server = m.group('whoisServer')
             break
-    return success, registrar_server, lines
 
-def find_best_response(response_list):
-    if response_list is None or len(response_list) <= 0:
-        return
-    response_weight = []
+    return success, registrar_whois_server, lines
+
+
+def find_response_with_best_priority(response_list):
+    if response_list is None or response_list:  # None or empty list []
+        return None
+    if len(response_list) == 1:
+        return response_list[0]
+    all_response_priority = []
     for response in response_list:
-        response_weight.append(weight(response))
-    max_weight = max(response_weight)
-    # find max response
-    index = 0
-    for item in response_weight:
-        if item == max_weight:
-            return response_list
-        else:
-            index += 1
+        all_response_priority.append(priority(response))
+    max_priority = max(all_response_priority)
+    # find max priority response
+    for x in xrange(len(all_response_priority)):
+        if all_response_priority[x] == max_priority:
+            return response_list[x]
 
-def weight(response):
-    valid_line_matcher = r'^\s*(?P<key>[^:]+):\s+(?P<value>.*)$'
-    total = 0
+
+def priority(response):
+    valid_line_pattern = r'^\s*(?P<key>[^:]+):\s+(?P<value>.*)$'  # the key: value format
+    total_line_count = 0
     for line in response:
-        if (re.match(valid_line_matcher, line, re.I)):
-            #m = re.search(valid_line_matcher, line, re.I)
+        m = re.search(valid_line_pattern, line)
+        if m:
+            total_line_count += 1
             #print('\t%50s --> %s' % (m.group('key'), m.group('value') ) )
-            total += 1
-    return total
+    return total_line_count
+
 
 def query(domain):
-    received_response = []
+    candidate_response = []
+    # first query by IANA
     success, refer_server, lines = lookup_by_iana(domain)
     if not success:
         raise RuntimeError('fail to query domain by IANA')
-    else:# success
-        if refer_server is None:
-            # got final answer
-            received_response.append(lines)
-        else:
-            # need more lookup, clean up before query
-            received_response = []
-            whois_server = refer_server
-            max_number_of_lookup = 2
-            lookup_count = 0
-            while(lookup_count < max_number_of_lookup):
-                success, registrar_server, lines = lookup_by_registrar(domain, host=whois_server)
-                lookup_count += 1
-                if not success:
-                    break
-                # success
-                received_response.append(lines)
-                if registrar_server is not None and whois_server.lower() != str(registrar_server).strip().lower():
-                    # prepare to do another query
-                    whois_server = registrar_server
-                else:
-                    break
-    print('+' * 80)
-    print(find_best_response(received_response))
+    # otherwise success
+    if refer_server is None:
+        # when no refer whois server found, this final answer
+        candidate_response.append(lines)
+    else:  # found refer whois server, need more lookup
+        whois_server = refer_server
+        candidate_response = []  # clean up before query
+        max_number_of_lookup = 2
+        lookup_count = 0
+        while lookup_count < max_number_of_lookup:
+            # query
+            success, registrar_server, lines = lookup_by_registrar(domain, host=whois_server)
+            lookup_count += 1
+            if not success:
+                break  # break if query fail
+            candidate_response.append(lines)
+            if registrar_server is not None and whois_server.lower() != str(registrar_server).strip().lower():
+                # prepare to do another query
+                whois_server = registrar_server
+            else:
+                break
+    # print('+' * 80)
+    print(find_response_with_best_priority(candidate_response))
+
 
 if __name__ == '__main__':
-    input_params_num = len(sys.argv)
-    if (input_params_num <= 1):
-        raise RuntimeError('Invalid domain')
-    target = str(sys.argv[1])
+    if len(sys.argv) <= 1:
+        raise RuntimeError('please input domain to query')
+    target = str(sys.argv[1]).strip()
     query(target)
