@@ -13,7 +13,7 @@ def print_line():
 
 def lookup(domain, host, port='43', timeout=5):
     print_line()
-    print('Connecting to %s' % host, )
+    print 'Connecting to %s' % host
     print_line()
 
     tn = telnetlib.Telnet(host, port, timeout)
@@ -23,7 +23,7 @@ def lookup(domain, host, port='43', timeout=5):
     print(contents)
 
     print_line()
-    print('Disconnected from %s' % host, )
+    print 'Disconnected from %s' % host
     print_line()
 
     return contents
@@ -46,9 +46,6 @@ def lookup_by_iana(domain, port='43', timeout=5):
         if m:  # not None when regex matched
             record_matched = m.group('matchedRecordNum')
             # print('-' * 20 + str(record_matched) )
-            # check return value
-            if record_matched is None:
-                raise RuntimeError('IANA not return')
             # whether success or fail
             try:
                 success = True if int(record_matched) > 0 else False
@@ -102,9 +99,9 @@ def lookup_by_registrar(domain, host, port='43', timeout=5):
 
 
 def find_response_with_best_priority(response_list):
-    if response_list is None or response_list:  # None or empty list []
+    if not response_list:  # None or empty list []
         return None
-    if len(response_list) == 1:
+    elif len(response_list) == 1:
         return response_list[0]
     all_response_priority = []
     for response in response_list:
@@ -154,7 +151,7 @@ def query(domain):
                 whois_server = registrar_server
             else:
                 break
-    # print('+' * 80)
+    print('+' * 80)
     print(find_response_with_best_priority(candidate_response))
 
 
