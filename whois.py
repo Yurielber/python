@@ -160,7 +160,7 @@ def query(domain):
             else:
                 break
     lines = find_response_with_best_priority(candidate_response)
-    if not lines:  # not None or empty list []
+    if lines is not None and isinstance(list, lines):  # empty list []
         print('+' * 80)
         for line in lines:
             print(line)
