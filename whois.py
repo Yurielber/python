@@ -90,6 +90,9 @@ def lookup_by_registrar(domain, host, port='43', timeout=5):
             # test if domain match
             success = True if target_domain.lower().strip() == str(domain).lower() else False
             break
+    # target domain not found
+    if not success:
+        return success, None, None
 
     # test if additional whois server found
     registrar_whois_server_pattern = r'^\s*Registrar WHOIS Server:\s+(?P<whoisServer>whois[.].+)$'
