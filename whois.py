@@ -12,19 +12,24 @@ def print_line():
 
 
 def lookup(domain, host, port='43', timeout=5):
-    print_line()
-    print 'Connecting to %s' % host
-    print_line()
+    contents = []
 
-    tn = telnetlib.Telnet(host, port, timeout)
-    tn.write( domain + "\n")
-    contents = tn.read_all()
+    try:
+        print_line()
+        print 'Connecting to %s' % host
+        print_line()
 
-    print(contents)
+        tn = telnetlib.Telnet(host, port, timeout)
+        tn.write( domain + "\n")
+        contents = tn.read_all()
 
-    print_line()
-    print 'Disconnected from %s' % host
-    print_line()
+        print(contents)
+
+        print_line()
+        print 'Disconnected from %s' % host
+        print_line()
+    except:
+        pass
 
     return contents
 
@@ -151,8 +156,12 @@ def query(domain):
                 whois_server = registrar_server
             else:
                 break
-    print('+' * 80)
-    print(find_response_with_best_priority(candidate_response))
+    lines = find_response_with_best_priority(candidate_response)
+    if not lines:  # not None or empty list []
+        print('+' * 80)
+        for line in lines:
+            print(line)
+        print('+' * 80)
 
 
 if __name__ == '__main__':
