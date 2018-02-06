@@ -21,7 +21,7 @@ def lookup(domain, host, port='43', timeout=5, verbose=False):
             print_line()
 
         tn = telnetlib.Telnet(host, port, timeout)
-        tn.write( domain + "\n")
+        tn.write(domain + "\n")
         contents = tn.read_all()
 
         if verbose:
@@ -62,7 +62,7 @@ def lookup_by_iana(domain, port='43', timeout=5):
                 print('value not an integer')
 
     # test if refer whois server exist
-    iana_refer_whois_server_pattern = r'^\s*refer:\s+(?P<referWhoisServer>whois[.].+)$'
+    iana_refer_whois_server_pattern = r'^\s*refer:\s+(?P<referWhoisServer>.+)$'
 
     for line in lines:
         m = re.search(iana_refer_whois_server_pattern, line, re.I)
@@ -92,7 +92,9 @@ def lookup_by_registrar(domain, host, port='43', timeout=5):
             target_domain = m.group('domainName')
             # test if domain match
             success = True if target_domain.lower().strip() == str(domain).lower() else False
-            break
+            # handle for multiple domain name match, e.g., query domain in chinese often return multiple result
+            if success:  # found one, then break
+                break
     # target domain not found
     if not success:
         return success, None, None
@@ -132,7 +134,7 @@ def priority(response):
         m = re.search(valid_line_pattern, line)
         if m:
             body_line_count += 1
-            #print('\t%50s --> %s' % (m.group('key'), m.group('value') ) )
+            # print('\t%50s --> %s' % (m.group('key'), m.group('value') ) )
         comment = re.search(comment_line_begin_pattern, line)
         if comment:
             break  # here comment block begin, skip calculate
@@ -161,7 +163,8 @@ def query(domain):
             if not success:
                 break  # break if query fail
             candidate_response.append(lines)
-            if registrar_whois_server is not None and whois_server.lower() != str(registrar_whois_server).strip().lower():
+            if registrar_whois_server is not None and whois_server.lower() != str(
+                    registrar_whois_server).strip().lower():
                 # prepare to do another query
                 whois_server = registrar_whois_server
             else:  # no query need, quit
