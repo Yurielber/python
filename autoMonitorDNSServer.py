@@ -15,6 +15,24 @@ address_list = []
 dns_type = None
 
 
+def get_protocol_filter_regex():
+    pattern = ''
+    for proto in protocol_list:
+        pattern += '(' + proto + ')' + '|'
+    # remove trailing "|"
+    return pattern[:-1]
+
+
+def is_ipv4_address(address_str):
+    # ipv4 pattern
+    simple_ipv4_pattern = r'^(\d{1,3}[.]){3}\d{1,3}$'
+    addr = str(address_str).strip()
+    if addr and re.match(simple_ipv4_pattern, addr):
+        return addr
+    else:
+        return None
+
+
 def extract_address(config_file_path):
     # check if named or nsd
     address_regex = ''
@@ -28,16 +46,6 @@ def extract_address(config_file_path):
         address_regex = r'^\s*listen-on(\s+port\s+\d+)?\s+[{](?P<address>.*)[}]'
     # invoke extract process
     extract_address_from_config_file(config_file_path, address_regex)
-
-
-def is_ipv4_address(address_str):
-    # ipv4 pattern
-    simple_ipv4_pattern = r'^(\d{1,3}[.]){3}\d{1,3}$'
-    addr = str(address_str).strip()
-    if addr and re.match(simple_ipv4_pattern, addr):
-        return addr
-    else:
-        return None
 
 
 def extract_address_from_config_file(file_path, regex_pattern):
@@ -64,30 +72,18 @@ def extract_address_from_config_file(file_path, regex_pattern):
     address_list = addresses
 
 
-def get_protocol_filter_regex():
-    pattern = ''
-    for proto in protocol_list:
-        pattern += '(' + proto + ')' + '|'
-    # remove trailing "|"
-    return pattern[:-1]
-
-
-def template_command():
+def get_all_listening_address():
     cmd_template = "netstat --udp --tcp --listening --numeric --inet " \
                    '| awk \'{print $1" "$4}\' ' \
                    "| grep -o -E '^(%s)[[:space:]]+[.[:digit:]]+:%s' " \
                    "| sed 's/:%s//' " \
                    '| sort --unique'
     protocol_filter_regex = get_protocol_filter_regex()
-    return cmd_template % (protocol_filter_regex, port, port)
-
-
-def execute_command():
-    cmd = template_command()
+    cmd = cmd_template % (protocol_filter_regex, port, port)
     return commands.getoutput(cmd).strip()
 
 
-def assert_all_address_listening(command_output_text):
+def all_address_are_listening(command_output_text):
     normal = False
     # extract protocol and address form command output
     actual = []
@@ -115,7 +111,21 @@ def assert_all_address_listening(command_output_text):
     return normal
 
 
-def validate_input_parameter(parameters):
+def acquire_exclusive_lock():
+    if platform.system().lower() != 'linux':  # only works on Linux
+        return
+    # Without holding a reference to our socket somewhere it gets garbage
+    # collected when the function exits
+    command_name = 'DNSServerMonitorScriptCron'
+    acquire_exclusive_lock._lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        acquire_exclusive_lock._lock_socket.bind('\0' + command_name)
+    except socket.error:
+        print('acquire lock fail, another instance already running')
+        sys.exit(1)
+
+
+def validate_input(parameters):
     # input parameter length should great than 1
     if not parameters or len(parameters) <= 1:
         raise RuntimeError('please provide config file path')
@@ -134,12 +144,12 @@ def validate_input_parameter(parameters):
     return file_path
 
 
-def assert_normal(file_path):
+def everything_is_fine(file_path):
     extract_address(file_path)
-    return assert_all_address_listening(execute_command())
+    return all_address_are_listening(get_all_listening_address())
 
 
-def restart_dns_server():
+def restart_dns_service():
     print('restarting dns server...')
     cmd_template = "service %s restart"
     cmd = ''
@@ -150,28 +160,11 @@ def restart_dns_server():
     commands.getoutput(cmd).strip()
 
 
-def assert_one_instance():
-    if platform.system().lower() != 'linux':  # only available in Linux
-        return
-    # Without holding a reference to our socket somewhere it gets garbage
-    # collected when the function exits
-    command_name = 'DNSServerMonitorScriptCron'
-    assert_one_instance._lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-    try:
-        assert_one_instance._lock_socket.bind('\0' + command_name)
-    except socket.error:
-        print('acquire lock fail, another instance already running')
-        sys.exit(1)
-
-
 def main():
-    assert_one_instance()
-    file_path = validate_input_parameter(sys.argv)
-    if not assert_normal(file_path):
-        restart_dns_server()
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    acquire_exclusive_lock()  # make sure only one python script running
+    file_path = validate_input(sys.argv)
+    if not everything_is_fine(file_path):
+        restart_dns_service()
 
 
 if __name__ == '__main__':
